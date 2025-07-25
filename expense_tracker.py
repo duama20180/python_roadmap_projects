@@ -1,8 +1,8 @@
 import json
 import os
+import sys
 from datetime import datetime
 import json
-
 
 class Expense:
     def __init__(self, id, date, description, amount):
@@ -123,3 +123,29 @@ class CLIHandler:
 
     def handle_command(self, args):
         pass
+
+
+def main():
+    expense_tracker = ExpenseTracker()
+    cli = CLIHandler(expense_tracker)
+
+    if len(sys.argv) == 1:
+        print("Enter your commands to proceed:")
+        while True:
+            try:
+                user_input = input("expense-tracker ").strip()
+                if user_input.lower() in ("exit", "quit"):
+                    print("Exiting...")
+                    break
+                if user_input == "":
+                    continue
+                args = user_input.split()
+                cli.handle_command(args)
+            except KeyboardInterrupt:
+                print("\nInterrupted. Exiting...")
+                break
+    else:
+        cli.handle_command(sys.argv[1:])
+
+if __name__ == '__main__':
+    main()
