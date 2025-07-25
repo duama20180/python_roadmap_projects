@@ -1,21 +1,25 @@
+import csv
 import os
 import sys
 from datetime import datetime
 import json
 
+
 class Expense:
-    def __init__(self, id, date, description, amount):
+    def __init__(self, id, date, description, amount, category = None):
         self.id = id
         self.date = date
         self.description = description
         self.amount = amount
+        self.category = category
 
     def to_json(self):
         return  {
             'id': self.id,
             'date': self.date,
             'description': self.description,
-            'amount': self.amount
+            'amount': self.amount,
+            'category': self.category
         }
 
     @staticmethod
@@ -23,7 +27,8 @@ class Expense:
         return Expense(id = data['id'],
                        date = data['date'],
                        description = data['description'],
-                       amount = data['amount']
+                       amount = data['amount'],
+                       category = data['category']
                        )
 
 class ExpenseTracker:
@@ -55,22 +60,24 @@ class ExpenseTracker:
                 return expense
         return None
 
-    def add_expense(self, description, amount):
+    def add_expense(self, description, amount, category = None):
         expense = Expense(
             id = self._get_next_id(),
             date = datetime.now().strftime('%Y-%m-%d'),
             description = description,
-            amount = float(amount)
+            amount = float(amount),
+            category = category
         )
         self.expenses.append(expense)
         self.save_expenses()
         print(f"expense successfully added")
 
-    def update_expense(self, id, description, amount):
+    def update_expense(self, id, description, amount, category):
         expense = self._find_by_id(id)
         if expense:
             expense.description = description
             expense.amount = float(amount)
+            expense.category = category
             self.save_expenses()
             print(f"Expense successfully updated")
         else:
@@ -80,15 +87,15 @@ class ExpenseTracker:
 
         filtered = self.expenses
 
-        if category_status:
-            filtered = [expense for expense in filtered if expense.description == category_status]
+        if category_status is not None:
+            filtered = [expense for expense in filtered if expense.category == category_status]
 
         if not filtered:
             print("No expenses found")
             return
 
         for expense in filtered:
-            print(f"{expense.id}: {expense.date}| {expense.description} | {expense.amount}")
+            print(f"{expense.id}: {expense.date}| {expense.description} | {expense.amount} | {expense.category}")
 
     def delete_expense(self, id):
         expense = self._find_by_id(id)
@@ -123,6 +130,20 @@ class ExpenseTracker:
 
         print(f"Total expenses value: {total}")
 
+    def sort_by_category(self, sort_order = 'asc'):
+        if not self.expenses:
+            print("No expenses to sort.")
+            return
+
+        sorted_expenses = sorted(self.expenses,
+                                 key=lambda expense: expense.category if expense.category is not None else '',
+                                 reverse=(sort_order == "desc"))
+
+        for expense in sorted_expenses:
+            display_category = expense.category if expense.category is not None else "N/A"
+            print(f"{expense.id}: {expense.date} | {expense.description} | {expense.amount} | {display_category}")
+
+
 class CLIHandler:
     def __init__(self, expense_tracker):
         self.expense_tracker = expense_tracker
@@ -133,6 +154,8 @@ class CLIHandler:
             "view" : self._view_expenses,
             "summarize" : self._summarize_expenses,
             "help" : self._print_help,
+            "export" : self._export_to_csv,
+            "sort": self._sort_by_category,
         }
 
     @staticmethod
@@ -147,13 +170,21 @@ class CLIHandler:
             return None
 
     @staticmethod
-    def _parse_description_and_amount(args):
+    def _parse_description_and_amount_and_category(args):
         if len(args) < 2:
-            return None, None
+            return None, None, None
 
-        *description_parts, amount_str = args
-        description = " ".join(description_parts)
-        return description, amount_str
+        description_parts = []
+        for i, arg in enumerate(args[:-1]):  # All but last arg
+            try:
+                float(arg)  # Check if this is the amount
+                description = " ".join(description_parts) if description_parts else None
+                return description, arg, args[-1] if i == len(args) - 2 else None
+            except ValueError:
+                description_parts.append(arg)
+        # If all args are part of description and amount
+        description = " ".join(args[:-1]) if args[:-1] else None
+        return description, args[-1], None
 
     def handle_command(self, args):
         if not args:
@@ -170,14 +201,15 @@ class CLIHandler:
             self._print_help()
 
     def _add_expense(self, args):
-        description, amount_str = self._parse_description_and_amount(args)
+        description, amount_str, category = self._parse_description_and_amount_and_category(args)
 
         if description is None or amount_str is None:
             print("Usage: add \"<description>\" <amount>")
             print("Example: add \"Groceries\" 50.00")
             return
 
-        self.expense_tracker.add_expense(description, amount_str)
+        float(amount_str)
+        self.expense_tracker.add_expense(description, amount_str, category)
 
     def _update_expense(self, args):
         if len(args) < 2:  # At least ID and something else
@@ -189,14 +221,14 @@ class CLIHandler:
         if expense_id is None:
             return
 
-        description, amount_str = self._parse_description_and_amount(args[1:])  # Pass remaining args for desc/amount
+        description, amount_str, category = self._parse_description_and_amount_and_category(args[1:])  # Pass remaining args for desc/amount
 
         if description is None or amount_str is None:
             print("Usage: update <id> \"<new description>\" <new amount>")
             print("Example: update 1 \"New Description\" 75.50")
             return
 
-        self.expense_tracker.update_expense(expense_id, description, amount_str)
+        self.expense_tracker.update_expense(expense_id, description, amount_str, category)
 
     def _view_expenses(self, args):
         if len(args) == 1:
@@ -239,8 +271,27 @@ class CLIHandler:
                                      Example: summarize 07 (for July)
   help                           - Show this help message.
   exit/quit                      - Exit the application.
+  export                         - Export expenses to a CSV file.
 --------------------------------
         """)
+
+    @staticmethod
+    def _export_to_csv(self, args = None):
+        with open("expenses.json", "r") as f:
+            json_data = json.load(f)
+
+        if json_data:
+            headers = json_data[0].keys()
+        else:
+            headers = []
+
+        with open("expenses.csv", "w",newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=headers)
+            writer.writeheader()
+            writer.writerows(json_data)
+
+    def _sort_by_category(self, sort_order = "asc"):
+        self.expense_tracker.sort_by_category(sort_order)
 
 
 def main():
@@ -266,7 +317,7 @@ def main():
                 print(f"Error parsing input: {e}")
                 continue
             except KeyboardInterrupt:
-                print("\nInterrupted. Exiting Expense Tracker. Goodbye!")
+                print("\nInterrupted. Exiting Expense Tracker")
                 break
     else:
         try:
