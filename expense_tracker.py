@@ -258,22 +258,24 @@ class CLIHandler:
 
     def _print_help(self, args = None):
         print("""
---- Expense Tracker Commands ---
-  add "<description>" <amount>   - Add a new expense.
-                                     Example: add "Dinner with friends" 45.75
-  update <id> "<new description>" <new amount> - Update an existing expense.
-                                     Example: update 3 "Coffee" 3.50
-  view [category]                - View all expenses, or filter by category.
-                                     Example: view or view Groceries
-  delete <id>                    - Delete an expense by its ID.
-                                     Example: delete 5
-  summarize [month_number]       - Show total expenses (all or for a specific month).
-                                     Example: summarize 07 (for July)
-  help                           - Show this help message.
-  exit/quit                      - Exit the application.
-  export                         - Export expenses to a CSV file.
---------------------------------
-        """)
+        --- Expense Tracker Commands ---
+          add "<description>" <amount> [category]   - Add a new expense with optional category.
+                                             Example: add "Dinner with friends" 45.75 Food
+          update <id> "<new description>" <new amount> [category] - Update an existing expense.
+                                             Example: update 3 "Coffee" 3.50 Food
+          view [category]                - View all expenses, or filter by category.
+                                             Example: view or view Groceries
+          delete <id>                    - Delete an expense by its ID.
+                                             Example: delete 5
+          summarize [month_number]       - Show total expenses (all or for a specific month).
+                                             Example: summarize 07 (for July)
+          sort [asc|desc]               - Sort expenses by category.
+                                             Example: sort desc
+          help                           - Show this help message.
+          exit/quit                      - Exit the application.
+          export                         - Export expenses to a CSV file.
+        --------------------------------
+                """)
 
     @staticmethod
     def _export_to_csv(self, args = None):
